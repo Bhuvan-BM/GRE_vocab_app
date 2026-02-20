@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle, XCircle, RotateCcw, Trophy, BookOpen, AlertCircle, ChevronDown, ChevronRight, Eye, Brain, TrendingDown } from 'lucide-react';
+import { fetchWeakPairs, saveWeakPair, updateCorrectStreak, clearAllWeakPairs } from './lib/weakPairsService';
 
 // Comprehensive cluster tree structure with ALL 47 clusters
 const CLUSTER_TREE = [
@@ -669,7 +670,7 @@ const ClusterTreeView = () => {
 };
 
 // Main App Component
-const VocabStudyApp = () => {
+const VocabStudyApp = ({ user }) => {
     const [currentView, setCurrentView] = useState('practice'); // 'practice', 'tree', 'weak'
     const [currentQuestion, setCurrentQuestion] = useState(null);
     const [selectedWords, setSelectedWords] = useState([]);
@@ -680,18 +681,16 @@ const VocabStudyApp = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResult, setSearchResult] = useState(null);
 
-    // Load weak pairs from localStorage on mount
+    // Load weak pairs from Supabase on mount or when user changes
     useEffect(() => {
-        const saved = localStorage.getItem('gre_weak_pairs');
-        if (saved) {
-            setWeakPairs(JSON.parse(saved));
+        if (user?.id) {
+            const loadPairs = async () => {
+                const pairs = await fetchWeakPairs(user.id);
+                setWeakPairs(pairs);
+            };
+            loadPairs();
         }
-    }, []);
-
-    // Save weak pairs to localStorage whenever they change
-    useEffect(() => {
-        localStorage.setItem('gre_weak_pairs', JSON.stringify(weakPairs));
-    }, [weakPairs]);
+    }, [user?.id]);
 
     useEffect(() => {
         if (currentView === 'practice') {
@@ -771,7 +770,7 @@ const VocabStudyApp = () => {
         }
     };
 
-    const checkAnswer = () => {
+    const checkAnswer = async () => {
         if (selectedWords.length === 0) return;
 
         setShowFeedback(true);
@@ -834,63 +833,35 @@ const VocabStudyApp = () => {
         }));
     };
 
-    const addWeakPair = (word1, word2, reason) => {
-        const pairKey = [word1, word2].sort().join('|');
+    const addWeakPair = async (word1, word2, reason) => {
+        if (!user?.id) return;
 
-        // Get detailed info for both words (try to resolve similar entries)
         const word1Info = getWordInfo(word1);
         const word2Info = getWordInfo(word2);
 
-        setWeakPairs(prev => {
-            const existing = prev.find(p => p.key === pairKey);
-            if (existing) {
-                return prev.map(p =>
-                    p.key === pairKey
-                        ? { ...p, attempts: p.attempts + 1, lastSeen: new Date().toISOString() }
-                        : p
-                );
-            } else {
-                return [...prev, {
-                    key: pairKey,
-                    word1,
-                    word2,
-                    word1Info,
-                    word2Info,
-                    reason,
-                    attempts: 1,
-                    correctStreak: 0,
-                    lastSeen: new Date().toISOString()
-                }];
-            }
-        });
+        await saveWeakPair(user.id, word1, word2, word1Info, word2Info, reason);
+
+        // Refresh weak pairs from Supabase
+        const pairs = await fetchWeakPairs(user.id);
+        setWeakPairs(pairs);
     };
 
-    const removeWeakPairIfConsistent = (word1, word2) => {
-        const pairKey = [word1, word2].sort().join('|');
+    const removeWeakPairIfConsistent = async (word1, word2) => {
+        if (!user?.id) return;
 
-        setWeakPairs(prev => {
-            const existing = prev.find(p => p.key === pairKey);
-            if (existing) {
-                const newStreak = existing.correctStreak + 1;
-                // Remove after 3 consecutive correct answers
-                if (newStreak >= 3) {
-                    return prev.filter(p => p.key !== pairKey);
-                } else {
-                    return prev.map(p =>
-                        p.key === pairKey
-                            ? { ...p, correctStreak: newStreak, lastSeen: new Date().toISOString() }
-                            : p
-                    );
-                }
-            }
-            return prev;
-        });
+        await updateCorrectStreak(user.id, word1, word2);
+
+        // Refresh weak pairs from Supabase
+        const pairs = await fetchWeakPairs(user.id);
+        setWeakPairs(pairs);
     };
 
-    const clearWeakPairs = () => {
+    const clearWeakPairs = async () => {
         if (window.confirm('Are you sure you want to clear all weak pairs?')) {
-            setWeakPairs([]);
-            localStorage.removeItem('gre_weak_pairs');
+            if (user?.id) {
+                await clearAllWeakPairs(user.id);
+                setWeakPairs([]);
+            }
         }
     };
 
