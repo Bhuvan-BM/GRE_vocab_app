@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import clusterHelpers from './clusterHelpers';
 
 // Fetch all weak pairs for the logged-in user
 export const fetchWeakPairs = async (userId) => {
@@ -13,7 +14,23 @@ export const fetchWeakPairs = async (userId) => {
         console.error('Error fetching weak pairs:', error);
         return [];
     }
-    return data || [];
+
+    // Normalize row keys to camelCase expected by UI
+    const normalized = (row) => ({
+        ...row,
+        id: row.id,
+        userId: row.user_id ?? row.userId,
+        word1: row.word1,
+        word2: row.word2,
+        word1Info: row.word1_info ?? row.word1Info ?? null,
+        word2Info: row.word2_info ?? row.word2Info ?? null,
+        attempts: row.attempts ?? 0,
+        correctStreak: row.correct_streak ?? row.correctStreak ?? 0,
+        lastSeen: row.last_seen ?? row.lastSeen ?? null,
+        reason: row.reason ?? row.reason
+    });
+
+    return (data || []).map(normalized);
 };
 
 // Add or update a weak pair
@@ -105,4 +122,9 @@ export const clearAllWeakPairs = async (userId) => {
         .delete()
         .eq('user_id', userId);
     if (error) console.error('Error clearing weak pairs:', error);
+};
+
+// Generate in-memory weak pair candidates using cluster heuristics
+export const getWeakPairCandidates = (maxPairs = 200) => {
+    return clusterHelpers.buildWeakPairCandidates(maxPairs);
 };
