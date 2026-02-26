@@ -1316,7 +1316,7 @@ const VocabStudyApp = ({ user }) => {
 
                         {/* Word Selection */}
                         <div className="bg-white rounded-lg shadow-lg p-4 md:p-8 mb-6">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+                            <div className="grid grid-cols-1 gap-3 md:gap-4">
                                 {currentQuestion.words.map((word, index) => {
                                     const isSelected = selectedWords.includes(word);
                                     const pairNumber = getWordPairNumber(word);
