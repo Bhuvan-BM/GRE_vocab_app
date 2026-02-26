@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle, XCircle, RotateCcw, Trophy, BookOpen, AlertCircle, ChevronDown, ChevronRight, Eye, Brain, TrendingDown } from 'lucide-react';
+import { CheckCircle, XCircle, RotateCcw, Trophy, BookOpen, AlertCircle, ChevronDown, ChevronRight, Eye, Brain, TrendingDown, Edit3 } from 'lucide-react';
 import { fetchWeakPairs, saveWeakPair, updateCorrectStreak, clearAllWeakPairs } from './lib/weakPairsService';
 import GRE_CLUSTERS, { GRE_WORDS } from './lib/greClusters';
 import clusterHelpers from './lib/clusterHelpers';
@@ -103,9 +103,106 @@ const WeakWordDetail = ({ word, wordInfo }) => {
     );
 };
 
+// ---------- Visual Tree Theme Palette - Disciplined & Minimalist ----------
+const CLUSTER_THEMES = [
+    { name: 'Sky', border: 'border-sky-300', text: 'text-sky-600', icon: 'text-sky-500', bg: 'bg-sky-50' },
+    { name: 'Emerald', border: 'border-emerald-300', text: 'text-emerald-600', icon: 'text-emerald-500', bg: 'bg-emerald-50' },
+    { name: 'Rose', border: 'border-rose-300', text: 'text-rose-600', icon: 'text-rose-500', bg: 'bg-rose-50' },
+    { name: 'Amber', border: 'border-amber-300', text: 'text-amber-600', icon: 'text-amber-500', bg: 'bg-amber-50' },
+    { name: 'Violet', border: 'border-violet-300', text: 'text-violet-600', icon: 'text-violet-500', bg: 'bg-violet-50' },
+    { name: 'Orange', border: 'border-orange-300', text: 'text-orange-600', icon: 'text-orange-500', bg: 'bg-orange-50' },
+    { name: 'Indigo', border: 'border-indigo-300', text: 'text-indigo-600', icon: 'text-indigo-500', bg: 'bg-indigo-50' },
+    { name: 'Lime', border: 'border-lime-300', text: 'text-lime-600', icon: 'text-lime-500', bg: 'bg-lime-50' },
+];
+
+// ---------- WordFlipCard Component ----------
+const WordFlipCard = ({ word, meaning, theme, isWeak, isHighlighted, disabled, onClick }) => {
+    return (
+        <div
+            className={`flip-card w-28 h-12 ${isHighlighted && !disabled ? 'search-highlight-trigger' : ''} ${disabled ? 'opacity-40 grayscale-0 pointer-events-none' : ''}`}
+            onClick={(e) => {
+                e.stopPropagation();
+                if (!disabled) onClick();
+            }}
+        >
+            <div className="flip-card-inner w-full h-full relative">
+                {/* Front: Word - Minimalist text pill look */}
+                <div className={`flip-card-front absolute inset-0 rounded-lg border flex items-center justify-center px-1 shadow-sm transition-colors ${isWeak ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100'
+                    }`}>
+                    <span className={`text-[13px] font-semibold truncate w-full text-center ${isWeak ? 'text-red-700' : 'text-gray-700'}`}>
+                        {word}
+                    </span>
+                    {isWeak && <span className="weak-badge">!</span>}
+                </div>
+
+                {/* Back: Meaning Snap-view */}
+                <div className={`flip-card-back absolute inset-0 rounded-lg border flex items-center justify-center p-1 shadow-sm bg-slate-50 ${theme.border}`}>
+                    <span className="text-[10px] text-gray-500 font-medium text-center leading-tight line-clamp-2 px-1">
+                        {meaning.replace(/\//g, '•')}
+                    </span>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ---------- WordPopover Component ----------
+const WordPopover = ({ word, wordInfo, theme, onClose, onQuiz }) => {
+    if (!word) return null;
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/10 backdrop-blur-[2px]" onClick={onClose}>
+            <div
+                className={`popover-card bg-white rounded-xl shadow-2xl max-w-sm w-full overflow-hidden border border-gray-100`}
+                onClick={e => e.stopPropagation()}
+            >
+                <div className={`p-6 border-b border-gray-50 bg-white`}>
+                    <div className="flex justify-between items-start mb-1">
+                        <h3 className={`text-2xl font-bold text-gray-800`}>{word}</h3>
+                        <button onClick={onClose} className="text-gray-300 hover:text-gray-500 transition-colors">
+                            <X size={20} />
+                        </button>
+                    </div>
+                </div>
+
+                <div className="p-6 space-y-5">
+                    <div>
+                        <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Meaning</h4>
+                        <p className="text-gray-600 text-sm leading-relaxed">
+                            {wordInfo.meaning}
+                        </p>
+                    </div>
+
+                    <div>
+                        <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Synonyms ({wordInfo.synonyms.length})</h4>
+                        <div className="flex flex-wrap gap-1.5">
+                            {wordInfo.synonyms.map((s, i) => (
+                                <span key={i} className={`px-2 py-0.5 rounded bg-slate-50 text-slate-600 border border-slate-100 text-[11px] font-medium`}>
+                                    {s}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="pt-2">
+                        <button
+                            onClick={onQuiz}
+                            className={`w-full py-2.5 rounded-lg font-bold text-white text-sm transition-all shadow-sm active:scale-[0.98] ${theme.text.replace('text-', 'bg-').replace('600', '500')
+                                } hover:brightness-110`}
+                        >
+                            Quick Quiz
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // Component for Visual Cluster Tree
-const ClusterTreeView = () => {
-    const [expandedClusters, setExpandedClusters] = useState(new Set([1, 2, 3])); // First 3 expanded by default
+const ClusterTreeView = ({ weakWords = new Set(), searchQuery = '' }) => {
+    const [expandedClusters, setExpandedClusters] = useState(new Set([1, 2, 3]));
+    const [selectedWord, setSelectedWord] = useState(null);
 
     const toggleCluster = (clusterId) => {
         const newExpanded = new Set(expandedClusters);
@@ -117,81 +214,157 @@ const ClusterTreeView = () => {
         setExpandedClusters(newExpanded);
     };
 
-    const expandAll = () => {
-        setExpandedClusters(new Set(CLUSTER_TREE.map(c => c.id)));
+    const expandAll = () => setExpandedClusters(new Set(CLUSTER_TREE.map(c => c.id)));
+    const collapseAll = () => setExpandedClusters(new Set());
+
+    // Sort words: weak words first within each subcluster
+    const sortedWords = (words) => {
+        return [...words].sort((a, b) => {
+            const aWeak = weakWords.has(a.toLowerCase()) ? 0 : 1;
+            const bWeak = weakWords.has(b.toLowerCase()) ? 0 : 1;
+            return aWeak - bWeak;
+        });
     };
 
-    const collapseAll = () => {
-        setExpandedClusters(new Set());
+    const clusterHasWeakWords = (cluster) => {
+        return cluster.subClusters.some(sc =>
+            sc.words.some(w => weakWords.has(w.toLowerCase()))
+        );
     };
+
+    const sortedClusters = [...CLUSTER_TREE].sort((a, b) => {
+        const aHas = clusterHasWeakWords(a) ? 0 : 1;
+        const bHas = clusterHasWeakWords(b) ? 0 : 1;
+        return aHas - bHas;
+    });
+
+    useEffect(() => {
+        if (weakWords.size > 0 || searchQuery) {
+            const relevantIds = CLUSTER_TREE
+                .filter(c => {
+                    const hasWeak = clusterHasWeakWords(c);
+                    const hasSearch = searchQuery && c.subClusters.some(sc =>
+                        sc.words.some(w => w.toLowerCase().includes(searchQuery.toLowerCase()))
+                    );
+                    return hasWeak || hasSearch;
+                })
+                .map(c => c.id);
+
+            if (relevantIds.length > 0) {
+                setExpandedClusters(prev => {
+                    const next = new Set(prev);
+                    relevantIds.forEach(id => next.add(id));
+                    return next;
+                });
+            }
+        }
+    }, [weakWords.size, searchQuery]);
 
     return (
-        <div className="bg-white rounded-lg shadow-lg p-6">
-            <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                    <Brain className="text-purple-600" size={28} />
-                    Visual Cluster Tree - All {CLUSTER_TREE.length} Clusters
-                </h2>
+        <div className="bg-white rounded-2xl p-6 transition-all">
+            {/* Popover Detail Modal */}
+            {selectedWord && (
+                <WordPopover
+                    word={selectedWord}
+                    wordInfo={getWordInfo(selectedWord)}
+                    theme={CLUSTER_THEMES[(CLUSTER_TREE.find(c => c.subClusters.some(sc => sc.words.includes(selectedWord)))?.id || 1) % CLUSTER_THEMES.length]}
+                    onClose={() => setSelectedWord(null)}
+                    onQuiz={() => {
+                        console.log("Quiz for:", selectedWord);
+                        setSelectedWord(null);
+                    }}
+                />
+            )}
+
+            <div className="flex items-center justify-between mb-8 border-b border-gray-50 pb-6">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                        <Brain className="text-slate-400" size={24} />
+                        Vocabulary Network
+                    </h2>
+                    <p className="text-gray-400 text-sm mt-0.5">Visual concept clusters for easier memorization</p>
+                </div>
                 <div className="flex gap-2">
                     <button
                         onClick={expandAll}
-                        className="text-sm bg-purple-100 hover:bg-purple-200 text-purple-700 px-3 py-1 rounded"
+                        className="text-slate-500 hover:text-slate-800 font-bold px-3 py-1.5 rounded-lg text-xs transition-colors border border-transparent hover:border-slate-100"
                     >
                         Expand All
                     </button>
                     <button
                         onClick={collapseAll}
-                        className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded"
+                        className="text-slate-400 hover:text-slate-600 font-bold px-3 py-1.5 rounded-lg text-xs transition-colors"
                     >
                         Collapse All
                     </button>
                 </div>
             </div>
 
-            <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
-                {CLUSTER_TREE.map((cluster) => {
+            <div className={`space-y-4 max-h-[700px] overflow-y-auto pr-2 custom-scrollbar ${selectedWord ? 'pointer-events-none' : ''}`}>
+                {sortedClusters.map((cluster) => {
                     const isExpanded = expandedClusters.has(cluster.id);
+                    const hasWeak = clusterHasWeakWords(cluster);
+                    const theme = CLUSTER_THEMES[cluster.id % CLUSTER_THEMES.length];
+
                     return (
-                        <div key={cluster.id} className="border border-gray-200 rounded-lg overflow-hidden">
-                            {/* Cluster Header */}
+                        <div key={cluster.id} className={`rounded-xl border transition-all ${isExpanded ? 'border-gray-100 bg-slate-50/30' : 'border-transparent'}`}>
+                            {/* Cluster Header - minimalist accent */}
                             <button
                                 onClick={() => toggleCluster(cluster.id)}
-                                className="w-full bg-gradient-to-r from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 p-4 flex items-center justify-between transition-colors"
+                                className={`w-full p-4 rounded-xl flex items-center justify-between transition-all bg-white border ${isExpanded ? 'border-gray-100 shadow-sm' : 'border-gray-50 hover:border-gray-100'
+                                    } ${hasWeak ? 'border-red-100' : ''}`}
                             >
                                 <div className="flex items-center gap-3">
-                                    {isExpanded ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
-                                    <span className="font-bold text-gray-800">
-                                        Cluster {cluster.id}: {cluster.name}
-                                    </span>
-                                    <span className="text-sm bg-purple-200 text-purple-800 px-2 py-1 rounded-full">
-                                        {cluster.subClusters.length} sub-groups
-                                    </span>
+                                    <div className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}>
+                                        <ChevronRight size={16} className="text-gray-300" />
+                                    </div>
+                                    <div className="text-left">
+                                        <span className="font-bold text-gray-700">{cluster.name}</span>
+                                        {hasWeak && (
+                                            <span className="ml-2 text-[9px] font-bold text-red-500 uppercase tracking-tighter bg-red-50 px-1.5 py-0.5 rounded">
+                                                Review
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
+                                <span className="text-[10px] font-bold text-gray-300 uppercase tracking-tight">
+                                    {cluster.subClusters.length} groups
+                                </span>
                             </button>
 
                             {/* Sub-clusters */}
                             {isExpanded && (
-                                <div className="p-4 bg-gray-50 space-y-3">
-                                    {cluster.subClusters.map((subCluster, idx) => (
-                                        <div key={idx} className="bg-white border-l-4 border-indigo-400 rounded p-3">
-                                            <div className="font-semibold text-indigo-700 mb-2 text-sm">
-                                                📂 {subCluster.name}
+                                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4 animate-slide-in">
+                                    {cluster.subClusters.map((subCluster, idx) => {
+                                        const ordered = sortedWords(subCluster.words);
+                                        return (
+                                            <div key={idx} className={`subcluster-card bg-white border border-gray-100 rounded-lg p-3 shadow-sm`}>
+                                                <div className={`flex items-center gap-2 mb-3 border-b border-gray-50 pb-2`}>
+                                                    <div className={`w-1.5 h-1.5 rounded-full ${theme.icon.replace('text-', 'bg-')}`} />
+                                                    <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">{subCluster.name}</span>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2.5">
+                                                    {ordered.map((word, wordIdx) => {
+                                                        const isWordWeak = weakWords.has(word.toLowerCase());
+                                                        const isWordHighlighted = searchQuery && word.toLowerCase().includes(searchQuery.toLowerCase());
+
+                                                        return (
+                                                            <WordFlipCard
+                                                                key={wordIdx}
+                                                                word={word}
+                                                                meaning={subCluster.name}
+                                                                theme={theme}
+                                                                isWeak={isWordWeak}
+                                                                isHighlighted={isWordHighlighted}
+                                                                disabled={!!selectedWord}
+                                                                onClick={() => setSelectedWord(word)}
+                                                            />
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
-                                            <div className="flex flex-wrap gap-2">
-                                                {subCluster.words.map((word, wordIdx) => (
-                                                    <span
-                                                        key={wordIdx}
-                                                        className="bg-indigo-50 text-indigo-800 px-3 py-1 rounded-full text-sm font-medium border border-indigo-200"
-                                                    >
-                                                        {word}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                            <div className="mt-2 text-xs text-gray-600 italic">
-                                                {subCluster.words.length} synonymous words
-                                            </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
@@ -202,9 +375,397 @@ const ClusterTreeView = () => {
     );
 };
 
+// ---------- Fuzzy meaning matching helpers ----------
+const stopWords = new Set(['a', 'an', 'the', 'to', 'of', 'in', 'for', 'and', 'or', 'is', 'are', 'be', 'with', 'on', 'at', 'by', 'it', 'as', 'but', 'not', 'very', 'too', 'so', 'do', 'does', 'did', 'has', 'have', 'had']);
+
+const tokenize = (str) => {
+    return (str || '').toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter(t => t.length > 0 && !stopWords.has(t));
+};
+
+const wordOverlapScore = (a, b) => {
+    const tokensA = tokenize(a);
+    const tokensB = tokenize(b);
+    if (tokensA.length === 0 || tokensB.length === 0) return 0;
+    let matches = 0;
+    tokensA.forEach(ta => {
+        if (tokensB.some(tb => tb === ta || tb.startsWith(ta) || ta.startsWith(tb))) matches++;
+    });
+    return matches / Math.max(tokensA.length, tokensB.length);
+};
+
+const judgeMeaning = (userMeaning, canonical) => {
+    const score = wordOverlapScore(userMeaning, canonical);
+    if (score >= 0.6) return 'correct';
+    if (score >= 0.3) return 'close';
+    return 'incorrect';
+};
+
+// ---------- RecallQuiz Component ----------
+const RecallQuiz = () => {
+    const [targetWord, setTargetWord] = useState(null);
+    const [trueSynonyms, setTrueSynonyms] = useState([]);
+    const [canonicalMeaning, setCanonicalMeaning] = useState('');
+    const [meaningInput, setMeaningInput] = useState('');
+    const [pairsInput, setPairsInput] = useState('');
+    const [feedback, setFeedback] = useState(null);
+    const [recallScore, setRecallScore] = useState({ correct: 0, total: 0 });
+
+    const pickNewWord = () => {
+        setFeedback(null);
+        setMeaningInput('');
+        setPairsInput('');
+
+        // Pick a random group that has at least 2 words (so there's at least 1 synonym)
+        const eligible = SYNONYM_GROUPS.filter(g => g.words.length >= 2);
+        const group = eligible[Math.floor(Math.random() * eligible.length)];
+        const word = group.words[Math.floor(Math.random() * group.words.length)];
+        const synonyms = group.words.filter(w => w.toLowerCase() !== word.toLowerCase());
+
+        setTargetWord(word);
+        setTrueSynonyms(synonyms);
+        setCanonicalMeaning(group.meaning);
+    };
+
+    useEffect(() => { pickNewWord(); }, []);
+
+    const handleSubmit = () => {
+        if (!targetWord) return;
+
+        // --- Meaning check ---
+        const meaningVerdict = judgeMeaning(meaningInput.trim(), canonicalMeaning);
+
+        // --- Pairs check ---
+        const userPairs = pairsInput
+            .split(',')
+            .map(w => w.trim().toLowerCase())
+            .filter(w => w.length > 0);
+
+        const trueSet = new Set(trueSynonyms.map(w => w.toLowerCase()));
+        const userSet = new Set(userPairs);
+
+        const correctWords = userPairs.filter(w => trueSet.has(w));
+        const extraWords = userPairs.filter(w => !trueSet.has(w));
+        const missedWords = trueSynonyms.filter(w => !userSet.has(w.toLowerCase()));
+
+        const allPairsCorrect = correctWords.length === trueSynonyms.length && extraWords.length === 0;
+        const perfect = meaningVerdict === 'correct' && allPairsCorrect;
+
+        setRecallScore(prev => ({
+            correct: prev.correct + (perfect ? 1 : 0),
+            total: prev.total + 1
+        }));
+
+        setFeedback({
+            meaningVerdict,
+            correctWords,
+            extraWords,
+            missedWords
+        });
+    };
+
+    if (!targetWord) return <div className="text-center py-12">Loading…</div>;
+
+    const accuracy = recallScore.total > 0 ? Math.round((recallScore.correct / recallScore.total) * 100) : 0;
+
+    return (
+        <div className="space-y-6">
+            {/* Mini score bar */}
+            <div className="bg-white rounded-lg shadow p-4 flex items-center justify-between">
+                <div className="text-sm text-gray-600">
+                    Recall Score: <span className="font-bold text-indigo-700">{recallScore.correct}/{recallScore.total}</span>
+                    {recallScore.total > 0 && (
+                        <span className="ml-3 text-green-700 font-semibold">({accuracy}%)</span>
+                    )}
+                </div>
+            </div>
+
+            {/* Target word card */}
+            <div className="bg-white rounded-lg shadow-lg p-8">
+                <div className="text-center mb-8">
+                    <div className="text-sm uppercase tracking-wider text-gray-500 mb-2">What does this word mean?</div>
+                    <div className="text-4xl font-extrabold text-indigo-800 tracking-wide">{targetWord}</div>
+                </div>
+
+                {/* Meaning input */}
+                <div className="mb-6">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        📖 Meaning <span className="text-gray-400 font-normal">(1–3 words)</span>
+                    </label>
+                    <input
+                        type="text"
+                        value={meaningInput}
+                        onChange={e => setMeaningInput(e.target.value)}
+                        placeholder='e.g. "calm down" or "praise highly"'
+                        disabled={!!feedback}
+                        className="w-full border-2 border-gray-300 rounded-lg px-4 py-3 text-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-colors disabled:bg-gray-100"
+                    />
+                </div>
+
+                {/* Pair words input */}
+                <div className="mb-6">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        🔗 Pair Words / Synonyms <span className="text-gray-400 font-normal">(comma-separated)</span>
+                    </label>
+                    <input
+                        type="text"
+                        value={pairsInput}
+                        onChange={e => setPairsInput(e.target.value)}
+                        placeholder='e.g. "copious, profuse, plentiful, abundant"'
+                        disabled={!!feedback}
+                        className="w-full border-2 border-gray-300 rounded-lg px-4 py-3 text-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-colors disabled:bg-gray-100"
+                    />
+                </div>
+
+                {/* Submit / Next */}
+                <div className="flex justify-center gap-4">
+                    {!feedback ? (
+                        <button
+                            onClick={handleSubmit}
+                            disabled={meaningInput.trim().length === 0 && pairsInput.trim().length === 0}
+                            className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white font-bold py-3 px-8 rounded-lg text-lg flex items-center gap-2 transition-colors"
+                        >
+                            <Trophy size={20} />
+                            Check Answer
+                        </button>
+                    ) : (
+                        <button
+                            onClick={pickNewWord}
+                            className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg text-lg flex items-center gap-2 transition-colors"
+                        >
+                            <RotateCcw size={20} />
+                            Next Word
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {/* Feedback block */}
+            {feedback && (
+                <div className="bg-white rounded-lg shadow-lg p-6 space-y-5">
+                    <h3 className="text-xl font-bold text-gray-800">Feedback</h3>
+
+                    {/* Meaning result */}
+                    <div className={`border-l-4 p-4 rounded ${feedback.meaningVerdict === 'correct'
+                        ? 'bg-green-50 border-green-500'
+                        : feedback.meaningVerdict === 'close'
+                            ? 'bg-yellow-50 border-yellow-500'
+                            : 'bg-red-50 border-red-500'
+                        }`}>
+                        <div className="flex items-center gap-2 mb-1">
+                            {feedback.meaningVerdict === 'correct' && <CheckCircle className="text-green-600" size={20} />}
+                            {feedback.meaningVerdict === 'close' && <AlertCircle className="text-yellow-600" size={20} />}
+                            {feedback.meaningVerdict === 'incorrect' && <XCircle className="text-red-600" size={20} />}
+                            <span className={`font-bold ${feedback.meaningVerdict === 'correct' ? 'text-green-800'
+                                : feedback.meaningVerdict === 'close' ? 'text-yellow-800'
+                                    : 'text-red-800'
+                                }`}>
+                                Meaning: {feedback.meaningVerdict === 'correct' ? 'Correct!' : feedback.meaningVerdict === 'close' ? 'Close!' : 'Incorrect'}
+                            </span>
+                        </div>
+                        <div className="text-sm text-gray-700 mt-1">
+                            Canonical meaning: <em className="font-semibold">"{canonicalMeaning}"</em>
+                        </div>
+                    </div>
+
+                    {/* Pair words result */}
+                    <div className="space-y-3">
+                        <h4 className="font-semibold text-gray-700">Pair Words Result</h4>
+
+                        {/* Correct */}
+                        {feedback.correctWords.length > 0 && (
+                            <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded">
+                                <div className="text-sm font-bold text-green-800 mb-2 flex items-center gap-1">
+                                    <CheckCircle size={16} /> Correct ({feedback.correctWords.length})
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {feedback.correctWords.map((w, i) => (
+                                        <span key={i} className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold border border-green-300">{w}</span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Missed */}
+                        {feedback.missedWords.length > 0 && (
+                            <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded">
+                                <div className="text-sm font-bold text-yellow-800 mb-2 flex items-center gap-1">
+                                    <AlertCircle size={16} /> Missed ({feedback.missedWords.length})
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {feedback.missedWords.map((w, i) => (
+                                        <span key={i} className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-semibold border border-yellow-300">{w}</span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Extra / Wrong */}
+                        {feedback.extraWords.length > 0 && (
+                            <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded">
+                                <div className="text-sm font-bold text-red-800 mb-2 flex items-center gap-1">
+                                    <XCircle size={16} /> Extra / Wrong ({feedback.extraWords.length})
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {feedback.extraWords.map((w, i) => (
+                                        <span key={i} className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-semibold border border-red-300">{w}</span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Full correct answer */}
+                        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+                            <div className="text-sm font-bold text-blue-800 mb-2">Full Correct Synonym List</div>
+                            <div className="flex flex-wrap gap-2">
+                                {trueSynonyms.map((w, i) => (
+                                    <span key={i} className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-semibold border border-blue-300">{w}</span>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ---------- WeakWordChip Component ----------
+const WeakWordChip = ({ word, streak, isGraduating, onClick }) => {
+    return (
+        <button
+            onClick={onClick}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold border whitespace-nowrap transition-all ${isGraduating
+                ? 'bg-yellow-100 text-yellow-700 border-yellow-300 animate-slide-in'
+                : 'bg-red-100 text-red-700 border-red-300 animate-slide-in'
+                }`}
+        >
+            <span>{word}</span>
+            <span className={`text-xs px-1.5 py-0.5 rounded-full ${isGraduating
+                ? 'bg-yellow-200 text-yellow-800'
+                : 'bg-red-200 text-red-800'
+                }`}>
+                {streak}/3
+            </span>
+        </button>
+    );
+};
+
+// ---------- QuickReview Component ----------
+const QuickReview = ({ targetWord, wordInfo, onClose }) => {
+    if (!wordInfo) return null;
+    const synonyms = wordInfo.synonyms || [];
+
+    return (
+        <div className="bg-white border-2 border-indigo-200 rounded-lg p-5 mb-4 animate-slide-in shadow-lg">
+            <div className="flex items-center justify-between mb-4 border-b border-indigo-50 pb-2">
+                <div className="font-extrabold text-indigo-900 text-xl tracking-tight">
+                    {targetWord}
+                </div>
+                <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+                    <XCircle size={20} />
+                </button>
+            </div>
+
+            <div className="space-y-4">
+                <div>
+                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Meaning</div>
+                    <div className="text-gray-800 font-medium italic leading-relaxed">
+                        "{wordInfo.meaning}"
+                    </div>
+                </div>
+
+                {synonyms.length > 0 && (
+                    <div>
+                        <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Related Words</div>
+                        <div className="flex flex-wrap gap-2">
+                            {synonyms.map((syn, idx) => (
+                                <span
+                                    key={idx}
+                                    className="bg-slate-50 text-slate-700 px-2.5 py-1 rounded text-xs font-bold border border-slate-100"
+                                >
+                                    {syn}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+            <button
+                onClick={onClose}
+                className="w-full mt-6 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-bold py-2 rounded-lg text-xs transition-colors"
+            >
+                DONE REVIEWING
+            </button>
+        </div>
+    );
+};
+
+// ---------- WeakStrip Component ----------
+const WeakStrip = ({ weakPairs, onResult }) => {
+    const [activeChip, setActiveChip] = useState(null);
+
+    if (!weakPairs || weakPairs.length === 0) return null;
+
+    // Extract unique weak words from pairs
+    const chipWords = [];
+    const seen = new Set();
+    weakPairs.forEach(pair => {
+        [pair.word1, pair.word2].forEach(w => {
+            const lower = w.toLowerCase();
+            if (!seen.has(lower)) {
+                seen.add(lower);
+                chipWords.push({
+                    word: w,
+                    streak: pair.correctStreak || 0,
+                    isGraduating: (pair.correctStreak || 0) >= 2
+                });
+            }
+        });
+    });
+
+    if (chipWords.length === 0) return null;
+
+    const activeWordInfo = activeChip ? getWordInfo(activeChip) : null;
+
+    return (
+        <div className="mb-4">
+            <div className="bg-white rounded-lg shadow p-3">
+                <div className="flex items-center gap-2 mb-2">
+                    <AlertCircle size={16} className="text-red-500" />
+                    <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Weak Words</span>
+                    <span className="text-xs text-gray-400">({chipWords.length})</span>
+                </div>
+                <div className="flex gap-2 overflow-x-auto pb-1 weak-strip">
+                    {chipWords.slice(0, 20).map((chip, i) => (
+                        <WeakWordChip
+                            key={i}
+                            word={chip.word}
+                            streak={chip.streak}
+                            isGraduating={chip.isGraduating}
+                            onClick={() => setActiveChip(activeChip === chip.word ? null : chip.word)}
+                        />
+                    ))}
+                </div>
+            </div>
+
+            {/* QuickReview for tapped chip */}
+            {activeChip && activeWordInfo && (
+                <QuickReview
+                    targetWord={activeChip}
+                    wordInfo={activeWordInfo}
+                    onClose={() => setActiveChip(null)}
+                />
+            )}
+        </div>
+    );
+};
+
 // Main App Component
 const VocabStudyApp = ({ user }) => {
-    const [currentView, setCurrentView] = useState('practice'); // 'practice', 'tree', 'weak'
+    const [currentView, setCurrentView] = useState('practice'); // 'practice', 'tree', 'weak', 'recall'
     const [currentQuestion, setCurrentQuestion] = useState(null);
     const [selectedWords, setSelectedWords] = useState([]);
     const [showFeedback, setShowFeedback] = useState(false);
@@ -236,33 +797,49 @@ const VocabStudyApp = ({ user }) => {
         setShowFeedback(false);
         setPairResults([]);
 
+        const isLockdown = weakPairs.length >= 30;
         const numPairs = Math.floor(Math.random() * 3) + 1;
-        const selectedGroups = [];
-        const usedGroups = new Set();
-
-        while (selectedGroups.length < numPairs) {
-            const randomIndex = Math.floor(Math.random() * SYNONYM_GROUPS.length);
-            if (!usedGroups.has(randomIndex)) {
-                const group = SYNONYM_GROUPS[randomIndex];
-                if (group.words.length >= 2) {
-                    selectedGroups.push(group);
-                    usedGroups.add(randomIndex);
-                }
-            }
-        }
-
         const questionWords = [];
         const correctPairs = [];
 
-        selectedGroups.forEach(group => {
-            const shuffled = [...group.words].sort(() => Math.random() - 0.5);
-            const pair = shuffled.slice(0, 2);
-            questionWords.push(...pair);
-            correctPairs.push({
-                words: pair,
-                meaning: group.meaning
+        if (isLockdown) {
+            // LOCKDOWN MODE: Pick pairs exclusively from weakPairs
+            const shuffledWeak = [...weakPairs].sort(() => Math.random() - 0.5);
+            const selectedWeak = shuffledWeak.slice(0, numPairs);
+
+            selectedWeak.forEach(pair => {
+                questionWords.push(pair.word1, pair.word2);
+                correctPairs.push({
+                    words: [pair.word1, pair.word2],
+                    meaning: pair.word1Info?.meaning || pair.word2Info?.meaning || 'Mastery Review'
+                });
             });
-        });
+        } else {
+            // NORMAL MODE: Pick random groups from SYNONYM_GROUPS
+            const selectedGroups = [];
+            const usedGroups = new Set();
+
+            while (selectedGroups.length < numPairs) {
+                const randomIndex = Math.floor(Math.random() * SYNONYM_GROUPS.length);
+                if (!usedGroups.has(randomIndex)) {
+                    const group = SYNONYM_GROUPS[randomIndex];
+                    if (group.words.length >= 2) {
+                        selectedGroups.push(group);
+                        usedGroups.add(randomIndex);
+                    }
+                }
+            }
+
+            selectedGroups.forEach(group => {
+                const shuffled = [...group.words].sort(() => Math.random() - 0.5);
+                const pair = shuffled.slice(0, 2);
+                questionWords.push(...pair);
+                correctPairs.push({
+                    words: pair,
+                    meaning: group.meaning
+                });
+            });
+        }
 
         const neededDistractors = 6 - questionWords.length;
         const shuffledDistractors = [...DISTRACTOR_WORDS].sort(() => Math.random() - 0.5);
@@ -270,6 +847,7 @@ const VocabStudyApp = ({ user }) => {
         for (let i = 0; i < neededDistractors; i++) {
             let distractor = shuffledDistractors[i];
             let attempts = 0;
+            // Ensure distractors don't overlap with question words
             while (questionWords.includes(distractor) && attempts < 50) {
                 distractor = DISTRACTOR_WORDS[Math.floor(Math.random() * DISTRACTOR_WORDS.length)];
                 attempts++;
@@ -284,7 +862,8 @@ const VocabStudyApp = ({ user }) => {
         setCurrentQuestion({
             words: shuffledWords,
             correctPairs: correctPairs,
-            numPairs: numPairs
+            numPairs: numPairs,
+            isLockdown: isLockdown
         });
     };
 
@@ -382,6 +961,7 @@ const VocabStudyApp = ({ user }) => {
     const removeWeakPairIfConsistent = async (word1, word2) => {
         if (!user?.id) return;
 
+        // In lockdown or normal mode, we now require 3 streaks to graduate
         await updateCorrectStreak(user.id, word1, word2);
 
         // Refresh weak pairs from Supabase
@@ -432,12 +1012,21 @@ const VocabStudyApp = ({ user }) => {
     }
 
     const accuracy = score.total > 0 ? Math.round((score.correct / score.total) * 100) : 0;
+    const isLockdown = weakPairs.length >= 30;
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 md:p-8">
             <div className="max-w-6xl mx-auto">
+                {/* Lockdown Banner */}
+                {isLockdown && currentView === 'practice' && (
+                    <div className="bg-red-600 text-white p-3 rounded-t-lg text-center animate-pulse flex items-center justify-center gap-2 font-bold text-sm">
+                        <AlertCircle size={18} />
+                        WEAK-PAIR LOCKDOWN: FOCUS ON MASTERING THESE 30 PAIRS
+                    </div>
+                )}
+
                 {/* Main Header */}
-                <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <div className={`bg-white rounded-lg shadow-lg p-6 mb-6 ${isLockdown && currentView === 'practice' ? 'rounded-t-none border-t-0' : ''}`}>
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-3">
                             <BookOpen className="text-indigo-600" size={32} />
@@ -491,6 +1080,16 @@ const VocabStudyApp = ({ user }) => {
                             <TrendingDown size={18} />
                             Weak Pairs ({weakPairs.length})
                         </button>
+                        <button
+                            onClick={() => setCurrentView('recall')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-colors ${currentView === 'recall'
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                }`}
+                        >
+                            <Edit3 size={18} />
+                            Recall Quiz
+                        </button>
                         {/* Quick word search */}
                         <div className="flex items-center gap-2 ml-4">
                             <input
@@ -506,6 +1105,23 @@ const VocabStudyApp = ({ user }) => {
                     </div>
                 </div>
 
+                {/* Weak Words Strip — shown on all views when there are weak pairs */}
+                <WeakStrip
+                    weakPairs={weakPairs}
+                    onResult={async (word, isCorrect) => {
+                        // Find matching pair and update streak
+                        if (user?.id && isCorrect) {
+                            const matchingPair = weakPairs.find(p =>
+                                p.word1.toLowerCase() === word.toLowerCase() ||
+                                p.word2.toLowerCase() === word.toLowerCase()
+                            );
+                            if (matchingPair) {
+                                await removeWeakPairIfConsistent(matchingPair.word1, matchingPair.word2);
+                            }
+                        }
+                    }}
+                />
+
                 {/* Content Area */}
                 {/* Search Result Display */}
                 {searchResult && (
@@ -514,7 +1130,15 @@ const VocabStudyApp = ({ user }) => {
                         <WeakWordDetail word={searchResult.word} wordInfo={searchResult.info} />
                     </div>
                 )}
-                {currentView === 'tree' && <ClusterTreeView />}
+                {currentView === 'tree' && <ClusterTreeView
+                    searchQuery={searchQuery}
+                    weakWords={(() => {
+                        const s = new Set();
+                        weakPairs.forEach(p => { s.add(p.word1.toLowerCase()); s.add(p.word2.toLowerCase()); });
+                        return s;
+                    })()}
+                />}
+                {currentView === 'recall' && <RecallQuiz />}
 
                 {currentView === 'weak' && (
                     <div className="bg-white rounded-lg shadow-lg p-6">
@@ -541,55 +1165,72 @@ const VocabStudyApp = ({ user }) => {
                             </div>
                         ) : (
                             <div className="space-y-6">
-                                {weakPairs.map((pair, index) => (
-                                    <div key={index} className="bg-white border-2 border-red-200 rounded-lg p-5 shadow-sm">
-                                        {/* Header with pair and stats */}
-                                        <div className="flex items-center justify-between mb-3 pb-3 border-b border-red-100">
-                                            <div className="flex items-center gap-3">
-                                                <span className="bg-red-100 text-red-800 px-4 py-2 rounded-lg font-bold text-lg">
-                                                    {pair.word1}
-                                                </span>
-                                                <span className="text-red-600 font-bold text-xl">+</span>
-                                                <span className="bg-red-100 text-red-800 px-4 py-2 rounded-lg font-bold text-lg">
-                                                    {pair.word2}
-                                                </span>
-                                            </div>
-                                            <div className="text-right text-sm">
-                                                <div className="text-gray-600 font-semibold">Attempts: <span className="text-red-600">{pair.attempts}</span></div>
-                                                <div className="text-gray-600 font-semibold">
-                                                    Mastery: <span className={pair.correctStreak >= 2 ? 'text-green-600' : 'text-orange-600'}>
-                                                        {pair.correctStreak}/3
+                                {weakPairs.map((pair, index) => {
+                                    const hasSameMeaning = pair.word1Info?.meaning && pair.word1Info?.meaning === pair.word2Info?.meaning;
+                                    const combinedSynonyms = Array.from(new Set([
+                                        ...(pair.word1Info?.synonyms || []),
+                                        ...(pair.word2Info?.synonyms || [])
+                                    ])).filter(s => s.toLowerCase() !== pair.word1.toLowerCase() && s.toLowerCase() !== pair.word2.toLowerCase());
+
+                                    return (
+                                        <div key={index} className="bg-white border-2 border-red-200 rounded-lg p-5 shadow-sm">
+                                            {/* Header with pair and stats */}
+                                            <div className="flex items-center justify-between mb-3 pb-3 border-b border-red-100">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="bg-red-100 text-red-800 px-4 py-2 rounded-lg font-bold text-lg">
+                                                        {pair.word1}
+                                                    </span>
+                                                    <span className="text-red-600 font-bold text-xl">+</span>
+                                                    <span className="bg-red-100 text-red-800 px-4 py-2 rounded-lg font-bold text-lg">
+                                                        {pair.word2}
                                                     </span>
                                                 </div>
+                                                <div className="text-right text-sm">
+                                                    <div className="text-gray-600 font-semibold">Attempts: <span className="text-red-600">{pair.attempts}</span></div>
+                                                    <div className="text-gray-600 font-semibold">
+                                                        Mastery: <span className={pair.correctStreak >= 2 ? 'text-green-600' : 'text-orange-600'}>
+                                                            {pair.correctStreak}/3
+                                                        </span>
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </div>
 
-                                        {/* Error reason */}
-                                        <div className="bg-red-50 border-l-4 border-red-400 p-3 rounded mb-4">
-                                            <div className="text-sm text-red-800 font-semibold flex items-start gap-2">
-                                                <XCircle size={16} className="mt-0.5 flex-shrink-0" />
-                                                <span>{pair.reason}</span>
+                                            {/* Error reason or Simplified Meaning */}
+                                            <div className="bg-red-50 border-l-4 border-red-400 p-3 rounded mb-4">
+                                                <div className="text-sm text-red-800 font-semibold flex items-start gap-2">
+                                                    <XCircle size={16} className="mt-0.5 flex-shrink-0" />
+                                                    <span>{pair.reason}</span>
+                                                </div>
                                             </div>
-                                        </div>
 
-                                        {/* Detailed information for each word */}
-                                        <div className="grid md:grid-cols-2 gap-4">
-                                            <div>
-                                                <div className="text-sm font-bold text-gray-700 mb-2">Word 1 Details:</div>
-                                                <WeakWordDetail word={pair.word1} wordInfo={pair.word1Info} />
-                                            </div>
-                                            <div>
-                                                <div className="text-sm font-bold text-gray-700 mb-2">Word 2 Details:</div>
-                                                <WeakWordDetail word={pair.word2} wordInfo={pair.word2Info} />
-                                            </div>
-                                        </div>
+                                            {/* Detailed information or Simplified Related Words */}
+                                            {hasSameMeaning ? (
+                                                <div className="mt-4">
+                                                    <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Related Words</div>
+                                                    <div className="flex flex-wrap gap-2 text-sm text-gray-700">
+                                                        {combinedSynonyms.length > 0 ? combinedSynonyms.join(', ') : '—'}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="grid md:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <div className="text-sm font-bold text-gray-700 mb-2">Word 1 Details:</div>
+                                                        <WeakWordDetail word={pair.word1} wordInfo={pair.word1Info} />
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-sm font-bold text-gray-700 mb-2">Word 2 Details:</div>
+                                                        <WeakWordDetail word={pair.word2} wordInfo={pair.word2Info} />
+                                                    </div>
+                                                </div>
+                                            )}
 
-                                        {/* Last seen */}
-                                        <div className="text-xs text-gray-500 mt-4 text-right">
-                                            Last seen: {new Date(pair.lastSeen).toLocaleDateString()} at {new Date(pair.lastSeen).toLocaleTimeString()}
+                                            {/* Last seen */}
+                                            <div className="text-xs text-gray-500 mt-4 text-right italic">
+                                                Last seen: {new Date(pair.lastSeen).toLocaleDateString()} at {new Date(pair.lastSeen).toLocaleTimeString()}
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
@@ -600,11 +1241,8 @@ const VocabStudyApp = ({ user }) => {
                         {/* Instructions */}
                         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
                             <div className="bg-indigo-50 border-l-4 border-indigo-600 p-4 rounded">
-                                <p className="text-sm text-gray-700 mb-2">
-                                    <strong>Instructions:</strong> Select words in pairs. First two = Pair 1, next two = Pair 2, etc.
-                                </p>
                                 <p className="text-sm text-gray-700">
-                                    This question has <strong>{currentQuestion.numPairs}</strong> correct pair(s).
+                                    <strong>Instructions:</strong> Select words in pairs. First two = Pair 1, next two = Pair 2, etc.
                                 </p>
                             </div>
 
@@ -655,6 +1293,7 @@ const VocabStudyApp = ({ user }) => {
                                         textColor = colors.text;
                                     }
 
+                                    let animClass = '';
                                     if (showFeedback && isSelected) {
                                         const pairIndex = Math.floor(selectedWords.indexOf(word) / 2);
                                         const result = pairResults[pairIndex];
@@ -663,10 +1302,12 @@ const VocabStudyApp = ({ user }) => {
                                             bgColor = 'bg-green-100';
                                             borderColor = 'border-green-500';
                                             textColor = 'text-green-800';
+                                            animClass = 'animate-green-pulse';
                                         } else if (result) {
                                             bgColor = 'bg-red-100';
                                             borderColor = 'border-red-500';
                                             textColor = 'text-red-800';
+                                            animClass = 'animate-shake animate-red-glow';
                                         }
                                     }
 
@@ -675,7 +1316,7 @@ const VocabStudyApp = ({ user }) => {
                                             key={index}
                                             onClick={() => toggleWord(word)}
                                             disabled={showFeedback}
-                                            className={`${bgColor} ${textColor} border-2 ${borderColor} p-6 rounded-lg text-left font-semibold text-lg transition-all duration-200 ${!showFeedback ? 'cursor-pointer' : 'cursor-default'}`}
+                                            className={`${bgColor} ${textColor} border-2 ${borderColor} p-6 rounded-lg text-left font-semibold text-lg transition-all duration-200 ${!showFeedback ? 'cursor-pointer' : 'cursor-default'} ${animClass}`}
                                         >
                                             <div className="flex items-center justify-between">
                                                 <span>{word}</span>
@@ -687,7 +1328,10 @@ const VocabStudyApp = ({ user }) => {
                                                         {pairResults[Math.floor(selectedWords.indexOf(word) / 2)]?.isCorrect ? (
                                                             <CheckCircle className="text-green-600" size={24} />
                                                         ) : (
-                                                            <XCircle className="text-red-600" size={24} />
+                                                            <div className="flex items-center gap-1">
+                                                                <XCircle className="text-red-600" size={24} />
+                                                                <span className="bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">!</span>
+                                                            </div>
                                                         )}
                                                     </>
                                                 )}
