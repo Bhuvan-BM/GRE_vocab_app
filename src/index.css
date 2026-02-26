@@ -152,44 +152,61 @@
 }
 
 .weak-strip::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+/* Horizontal scroll utility for mobile nav */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f8fafc;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
   background: #e2e8f0;
-  border-radius: 2px;
+  border-radius: 10px;
 }
 
 /* ===== Visual Tree — Flip Cards & Interactive Styles ===== */
 
-/* 3D Flip Card */
+/* Minimalist Word Card */
 .flip-card {
   perspective: 800px;
   cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.flip-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .flip-card-inner {
   position: relative;
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  transform-style: preserve-3d;
+  width: 100%;
+  height: 100%;
 }
 
-.flip-card:hover .flip-card-inner,
-.flip-card.flipped .flip-card-inner {
-  transform: rotateY(180deg);
-}
-
-.flip-card-front,
-.flip-card-back {
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-}
-
-.flip-card-back {
-  position: absolute;
-  inset: 0;
-  transform: rotateY(180deg);
+.flip-card-front {
+  width: 100%;
+  height: 100%;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
 }
+
 
 /* Hover lift on word cards */
 .word-card {

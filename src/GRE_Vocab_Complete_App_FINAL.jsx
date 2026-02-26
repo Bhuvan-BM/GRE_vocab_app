@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle, XCircle, RotateCcw, Trophy, BookOpen, AlertCircle, ChevronDown, ChevronRight, Eye, Brain, TrendingDown, Edit3 } from 'lucide-react';
+import { CheckCircle, XCircle, RotateCcw, Trophy, BookOpen, AlertCircle, ChevronDown, ChevronRight, Eye, Brain, TrendingDown, Edit3, Volume2, X } from 'lucide-react';
 import { fetchWeakPairs, saveWeakPair, updateCorrectStreak, clearAllWeakPairs } from './lib/weakPairsService';
 import GRE_CLUSTERS, { GRE_WORDS } from './lib/greClusters';
 import clusterHelpers from './lib/clusterHelpers';
@@ -17,6 +17,26 @@ const SYNONYM_GROUPS = CLUSTER_TREE.flatMap(cluster =>
 
 // Distractor words (use all parsed words as potential distractors)
 const DISTRACTOR_WORDS = GRE_WORDS.map(w => w.text);
+
+// ---------- Pronunciation Helper (Web Speech API) ----------
+const speakWord = (text) => {
+    if (!('speechSynthesis' in window)) return;
+
+    // Stop any current speech
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+
+    // Try to find a high-quality English voice
+    const voices = window.speechSynthesis.getVoices();
+    const englishVoice = voices.find(v => v.lang.includes('en-US') || v.lang.includes('en-GB')) || voices[0];
+
+    if (englishVoice) utterance.voice = englishVoice;
+    utterance.rate = 0.9; // Slightly slower for clarity
+    utterance.pitch = 1.0;
+
+    window.speechSynthesis.speak(utterance);
+};
 
 // Use helper lookup for word info (cluster/subcluster + synonyms)
 const getWordInfo = (word) => {
@@ -117,31 +137,34 @@ const CLUSTER_THEMES = [
 
 // ---------- WordFlipCard Component ----------
 const WordFlipCard = ({ word, meaning, theme, isWeak, isHighlighted, disabled, onClick }) => {
+    const handleSpeak = (e) => {
+        e.stopPropagation();
+        speakWord(word);
+    };
+
     return (
         <div
-            className={`flip-card w-28 h-12 ${isHighlighted && !disabled ? 'search-highlight-trigger' : ''} ${disabled ? 'opacity-40 grayscale-0 pointer-events-none' : ''}`}
+            className={`flip-card w-28 h-12 flex items-center justify-center p-1 relative rounded-lg border shadow-sm transition-all ${isHighlighted && !disabled ? 'search-highlight-trigger' : ''
+                } ${disabled ? 'opacity-40 grayscale-0 pointer-events-none' : 'hover:scale-105'} ${isWeak ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100'
+                }`}
             onClick={(e) => {
                 e.stopPropagation();
-                if (!disabled) onClick();
+                if (!disabled) {
+                    speakWord(word);
+                    onClick();
+                }
             }}
         >
-            <div className="flip-card-inner w-full h-full relative">
-                {/* Front: Word - Minimalist text pill look */}
-                <div className={`flip-card-front absolute inset-0 rounded-lg border flex items-center justify-center px-1 shadow-sm transition-colors ${isWeak ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100'
-                    }`}>
-                    <span className={`text-[13px] font-semibold truncate w-full text-center ${isWeak ? 'text-red-700' : 'text-gray-700'}`}>
-                        {word}
-                    </span>
-                    {isWeak && <span className="weak-badge">!</span>}
-                </div>
-
-                {/* Back: Meaning Snap-view */}
-                <div className={`flip-card-back absolute inset-0 rounded-lg border flex items-center justify-center p-1 shadow-sm bg-slate-50 ${theme.border}`}>
-                    <span className="text-[10px] text-gray-500 font-medium text-center leading-tight line-clamp-2 px-1">
-                        {meaning.replace(/\//g, '•')}
-                    </span>
+            <div className="flex flex-col items-center justify-center w-full px-1">
+                <span className={`text-[13px] font-bold truncate w-full text-center ${isWeak ? 'text-red-700' : 'text-gray-800'}`}>
+                    {word}
+                </span>
+                <div className="flex items-center gap-1 mt-0.5" onClick={handleSpeak}>
+                    <Volume2 size={10} className={isWeak ? 'text-red-400' : 'text-gray-400'} />
+                    <span className="text-[8px] text-gray-400 font-medium uppercase tracking-tighter">Listen</span>
                 </div>
             </div>
+            {isWeak && <span className="weak-badge">!</span>}
         </div>
     );
 };
@@ -153,19 +176,28 @@ const WordPopover = ({ word, wordInfo, theme, onClose, onQuiz }) => {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/10 backdrop-blur-[2px]" onClick={onClose}>
             <div
-                className={`popover-card bg-white rounded-xl shadow-2xl max-w-sm w-full overflow-hidden border border-gray-100`}
+                className={`popover-card bg-white rounded-2xl shadow-2xl max-w-sm w-full mx-auto overflow-hidden border border-gray-100 flex flex-col max-h-[90vh]`}
                 onClick={e => e.stopPropagation()}
             >
                 <div className={`p-6 border-b border-gray-50 bg-white`}>
-                    <div className="flex justify-between items-start mb-1">
-                        <h3 className={`text-2xl font-bold text-gray-800`}>{word}</h3>
-                        <button onClick={onClose} className="text-gray-300 hover:text-gray-500 transition-colors">
+                    <div className="flex justify-between items-center mb-1">
+                        <div className="flex items-center gap-2">
+                            <h3 className={`text-2xl font-black text-gray-800 tracking-tight`}>{word}</h3>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); speakWord(word); }}
+                                className="p-1.5 rounded-full hover:bg-gray-100 transition-colors text-indigo-500"
+                                title="Listen to pronunciation"
+                            >
+                                <Volume2 size={20} />
+                            </button>
+                        </div>
+                        <button onClick={onClose} className="text-gray-300 hover:text-gray-500 transition-colors p-1">
                             <X size={20} />
                         </button>
                     </div>
                 </div>
 
-                <div className="p-6 space-y-5">
+                <div className="p-6 space-y-5 overflow-y-auto custom-scrollbar flex-1">
                     <div>
                         <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Meaning</h4>
                         <p className="text-gray-600 text-sm leading-relaxed">
@@ -177,7 +209,7 @@ const WordPopover = ({ word, wordInfo, theme, onClose, onQuiz }) => {
                         <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Synonyms ({wordInfo.synonyms.length})</h4>
                         <div className="flex flex-wrap gap-1.5">
                             {wordInfo.synonyms.map((s, i) => (
-                                <span key={i} className={`px-2 py-0.5 rounded bg-slate-50 text-slate-600 border border-slate-100 text-[11px] font-medium`}>
+                                <span key={i} className={`px-2 py-0.5 rounded-full bg-slate-50 text-slate-600 border border-slate-100 text-[11px] font-bold`}>
                                     {s}
                                 </span>
                             ))}
@@ -187,7 +219,7 @@ const WordPopover = ({ word, wordInfo, theme, onClose, onQuiz }) => {
                     <div className="pt-2">
                         <button
                             onClick={onQuiz}
-                            className={`w-full py-2.5 rounded-lg font-bold text-white text-sm transition-all shadow-sm active:scale-[0.98] ${theme.text.replace('text-', 'bg-').replace('600', '500')
+                            className={`w-full py-3.5 rounded-xl font-bold text-white text-sm transition-all shadow-sm active:scale-[0.98] ${theme.text.replace('text-', 'bg-').replace('600', '500')
                                 } hover:brightness-110`}
                         >
                             Quick Quiz
@@ -261,7 +293,7 @@ const ClusterTreeView = ({ weakWords = new Set(), searchQuery = '' }) => {
     }, [weakWords.size, searchQuery]);
 
     return (
-        <div className="bg-white rounded-2xl p-6 transition-all">
+        <div className="bg-white rounded-2xl p-4 md:p-8 transition-all">
             {/* Popover Detail Modal */}
             {selectedWord && (
                 <WordPopover
@@ -276,13 +308,13 @@ const ClusterTreeView = ({ weakWords = new Set(), searchQuery = '' }) => {
                 />
             )}
 
-            <div className="flex items-center justify-between mb-8 border-b border-gray-50 pb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 border-b border-gray-50 pb-6">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                        <Brain className="text-slate-400" size={24} />
+                    <h2 className="text-xl md:text-2xl font-bold text-gray-800 flex items-center gap-2">
+                        <Brain className="text-slate-400 shrink-0" size={24} />
                         Vocabulary Network
                     </h2>
-                    <p className="text-gray-400 text-sm mt-0.5">Visual concept clusters for easier memorization</p>
+                    <p className="text-gray-400 text-xs md:text-sm mt-0.5 italic">Visual concept clusters for easier memorization</p>
                 </div>
                 <div className="flex gap-2">
                     <button
@@ -334,11 +366,11 @@ const ClusterTreeView = ({ weakWords = new Set(), searchQuery = '' }) => {
 
                             {/* Sub-clusters */}
                             {isExpanded && (
-                                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4 animate-slide-in">
+                                <div className="p-3 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-4 animate-slide-in bg-slate-50/50">
                                     {cluster.subClusters.map((subCluster, idx) => {
                                         const ordered = sortedWords(subCluster.words);
                                         return (
-                                            <div key={idx} className={`subcluster-card bg-white border border-gray-100 rounded-lg p-3 shadow-sm`}>
+                                            <div key={idx} className={`subcluster-card bg-white border border-gray-100 rounded-xl p-3 md:p-4 shadow-sm`}>
                                                 <div className={`flex items-center gap-2 mb-3 border-b border-gray-50 pb-2`}>
                                                     <div className={`w-1.5 h-1.5 rounded-full ${theme.icon.replace('text-', 'bg-')}`} />
                                                     <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">{subCluster.name}</span>
@@ -1015,7 +1047,7 @@ const VocabStudyApp = ({ user }) => {
     const isLockdown = weakPairs.length >= 30;
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 md:p-8">
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-3 md:p-8">
             <div className="max-w-6xl mx-auto">
                 {/* Lockdown Banner */}
                 {isLockdown && currentView === 'practice' && (
@@ -1026,81 +1058,88 @@ const VocabStudyApp = ({ user }) => {
                 )}
 
                 {/* Main Header */}
-                <div className={`bg-white rounded-lg shadow-lg p-6 mb-6 ${isLockdown && currentView === 'practice' ? 'rounded-t-none border-t-0' : ''}`}>
-                    <div className="flex items-center justify-between mb-4">
+                <div className={`bg-white rounded-lg shadow-lg p-4 md:p-6 mb-4 md:mb-6 ${isLockdown && currentView === 'practice' ? 'rounded-t-none border-t-0' : ''}`}>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                         <div className="flex items-center gap-3">
-                            <BookOpen className="text-indigo-600" size={32} />
-                            <h1 className="text-3xl font-bold text-gray-800">GRE Vocab Master</h1>
+                            <BookOpen className="text-indigo-600 shrink-0" size={32} />
+                            <h1 className="text-2xl md:text-3xl font-bold text-gray-800 tracking-tight">GRE Vocab Master</h1>
                         </div>
-                        <div className="flex items-center gap-4">
-                            <div className="text-right">
-                                <div className="text-sm text-gray-600">Score</div>
-                                <div className="text-2xl font-bold text-indigo-600">{score.correct}/{score.total}</div>
+                        <div className="flex flex-wrap items-center gap-3 md:gap-6 bg-slate-50 p-3 rounded-xl md:bg-transparent md:p-0">
+                            <div className="text-left md:text-right">
+                                <div className="text-[10px] uppercase tracking-wider font-bold text-gray-400">Score</div>
+                                <div className="text-xl md:text-2xl font-black text-indigo-600 leading-none">{score.correct}/{score.total}</div>
                             </div>
-                            <div className="text-right">
-                                <div className="text-sm text-gray-600">Accuracy</div>
-                                <div className="text-2xl font-bold text-green-600">{accuracy}%</div>
+                            <div className="text-left md:text-right border-l md:border-l-0 pl-3 md:pl-0 border-gray-200">
+                                <div className="text-[10px] uppercase tracking-wider font-bold text-gray-400">Accuracy</div>
+                                <div className="text-xl md:text-2xl font-black text-green-600 leading-none">{accuracy}%</div>
                             </div>
-                            <div className="text-right">
-                                <div className="text-sm text-gray-600">Weak Pairs</div>
-                                <div className="text-2xl font-bold text-red-600">{weakPairs.length}</div>
+                            <div className="text-left md:text-right border-l md:border-l-0 pl-3 md:pl-0 border-gray-200">
+                                <div className="text-[10px] uppercase tracking-wider font-bold text-gray-400">Weak</div>
+                                <div className="text-xl md:text-2xl font-black text-red-600 leading-none">{weakPairs.length}</div>
                             </div>
                         </div>
                     </div>
 
-                    {/* View Selector */}
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() => setCurrentView('practice')}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-colors ${currentView === 'practice'
-                                ? 'bg-indigo-600 text-white'
-                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                }`}
-                        >
-                            <Trophy size={18} />
-                            Practice Quiz
-                        </button>
-                        <button
-                            onClick={() => setCurrentView('tree')}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-colors ${currentView === 'tree'
-                                ? 'bg-purple-600 text-white'
-                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                }`}
-                        >
-                            <Eye size={18} />
-                            Visual Tree
-                        </button>
-                        <button
-                            onClick={() => setCurrentView('weak')}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-colors ${currentView === 'weak'
-                                ? 'bg-red-600 text-white'
-                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                }`}
-                        >
-                            <TrendingDown size={18} />
-                            Weak Pairs ({weakPairs.length})
-                        </button>
-                        <button
-                            onClick={() => setCurrentView('recall')}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-colors ${currentView === 'recall'
-                                ? 'bg-emerald-600 text-white'
-                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                }`}
-                        >
-                            <Edit3 size={18} />
-                            Recall Quiz
-                        </button>
-                        {/* Quick word search */}
-                        <div className="flex items-center gap-2 ml-4">
-                            <input
-                                value={searchQuery}
-                                onChange={e => setSearchQuery(e.target.value)}
-                                onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                                placeholder="Search a word..."
-                                className="px-3 py-2 border rounded-lg text-sm w-56"
-                            />
-                            <button onClick={handleSearch} className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-sm">Search</button>
-                            <button onClick={clearSearch} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm">Clear</button>
+                    {/* View Selector & Search */}
+                    <div className="space-y-4">
+                        <div className="flex overflow-x-auto pb-2 -mx-2 px-2 gap-2 hide-scrollbar md:pb-0 md:mx-0 md:px-0">
+                            <button
+                                onClick={() => setCurrentView('practice')}
+                                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-xs md:text-sm whitespace-nowrap transition-all ${currentView === 'practice'
+                                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200 ring-2 ring-indigo-100'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    }`}
+                            >
+                                <Trophy size={16} />
+                                Practice Quiz
+                            </button>
+                            <button
+                                onClick={() => setCurrentView('tree')}
+                                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-xs md:text-sm whitespace-nowrap transition-all ${currentView === 'tree'
+                                    ? 'bg-purple-600 text-white shadow-md shadow-purple-200 ring-2 ring-purple-100'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    }`}
+                            >
+                                <Eye size={16} />
+                                Visual Tree
+                            </button>
+                            <button
+                                onClick={() => setCurrentView('weak')}
+                                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-xs md:text-sm whitespace-nowrap transition-all ${currentView === 'weak'
+                                    ? 'bg-red-600 text-white shadow-md shadow-red-200 ring-2 ring-red-100'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    }`}
+                            >
+                                <TrendingDown size={16} />
+                                Weak Pairs
+                            </button>
+                            <button
+                                onClick={() => setCurrentView('recall')}
+                                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-xs md:text-sm whitespace-nowrap transition-all ${currentView === 'recall'
+                                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200 ring-2 ring-emerald-100'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    }`}
+                            >
+                                <Edit3 size={16} />
+                                Recall Quiz
+                            </button>
+                        </div>
+
+                        {/* Quick Word Search */}
+                        <div className="flex flex-col sm:flex-row items-center gap-2 border-t border-gray-50 pt-4">
+                            <div className="relative w-full">
+                                <input
+                                    value={searchQuery}
+                                    onChange={e => setSearchQuery(e.target.value)}
+                                    onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                                    placeholder="Search 1100 words..."
+                                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 transition-all outline-none"
+                                />
+                            </div>
+                            <div className="flex gap-2 w-full sm:w-auto">
+                                <button onClick={handleSearch} className="flex-1 sm:flex-none bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-colors">Search</button>
+                                <button onClick={clearSearch} className="flex-1 sm:flex-none bg-gray-100 hover:bg-gray-200 text-gray-500 px-5 py-2.5 rounded-xl font-bold text-sm transition-colors">Clear</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1143,9 +1182,9 @@ const VocabStudyApp = ({ user }) => {
                 {currentView === 'weak' && (
                     <div className="bg-white rounded-lg shadow-lg p-6">
                         <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                                <TrendingDown className="text-red-600" size={28} />
-                                Words to Remember - Weak Pairs
+                            <h2 className="text-xl md:text-2xl font-bold text-gray-800 flex items-center gap-2">
+                                <TrendingDown className="text-red-600 shrink-0" size={28} />
+                                Words to Remember
                             </h2>
                             {weakPairs.length > 0 && (
                                 <button
@@ -1175,13 +1214,13 @@ const VocabStudyApp = ({ user }) => {
                                     return (
                                         <div key={index} className="bg-white border-2 border-red-200 rounded-lg p-5 shadow-sm">
                                             {/* Header with pair and stats */}
-                                            <div className="flex items-center justify-between mb-3 pb-3 border-b border-red-100">
-                                                <div className="flex items-center gap-3">
-                                                    <span className="bg-red-100 text-red-800 px-4 py-2 rounded-lg font-bold text-lg">
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 pb-4 border-b border-red-100">
+                                                <div className="flex items-center flex-wrap gap-2">
+                                                    <span className="bg-red-100 text-red-800 px-3 py-1.5 rounded-lg font-bold text-base md:text-lg">
                                                         {pair.word1}
                                                     </span>
                                                     <span className="text-red-600 font-bold text-xl">+</span>
-                                                    <span className="bg-red-100 text-red-800 px-4 py-2 rounded-lg font-bold text-lg">
+                                                    <span className="bg-red-100 text-red-800 px-3 py-1.5 rounded-lg font-bold text-base md:text-lg">
                                                         {pair.word2}
                                                     </span>
                                                 </div>
@@ -1276,8 +1315,8 @@ const VocabStudyApp = ({ user }) => {
                         </div>
 
                         {/* Word Selection */}
-                        <div className="bg-white rounded-lg shadow-lg p-8 mb-6">
-                            <div className="grid grid-cols-1 gap-4">
+                        <div className="bg-white rounded-lg shadow-lg p-4 md:p-8 mb-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
                                 {currentQuestion.words.map((word, index) => {
                                     const isSelected = selectedWords.includes(word);
                                     const pairNumber = getWordPairNumber(word);
@@ -1316,7 +1355,7 @@ const VocabStudyApp = ({ user }) => {
                                             key={index}
                                             onClick={() => toggleWord(word)}
                                             disabled={showFeedback}
-                                            className={`${bgColor} ${textColor} border-2 ${borderColor} p-6 rounded-lg text-left font-semibold text-lg transition-all duration-200 ${!showFeedback ? 'cursor-pointer' : 'cursor-default'} ${animClass}`}
+                                            className={`${bgColor} ${textColor} border-2 ${borderColor} p-4 md:p-6 rounded-xl text-left font-bold text-base md:text-lg transition-all duration-200 ${!showFeedback ? 'cursor-pointer active:scale-95' : 'cursor-default transition-none'} ${animClass}`}
                                         >
                                             <div className="flex items-center justify-between">
                                                 <span>{word}</span>
