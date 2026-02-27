@@ -48,9 +48,9 @@ export const getWordInfo = (word) => {
         groupId: info.groupId,
         groupName: info.groupName,
         subCluster: info.subCluster,
-        meaning: sub ? sub.name : info.subCluster,
+        meaning: info.meaning || (sub ? sub.name : info.subCluster),
         synonyms,
-        cluster: cluster ? `Cluster ${cluster.id}: ${cluster.name}` : info.groupName
+        cluster: cluster ? `Group ${cluster.id}: ${cluster.name}` : info.groupName
     };
 };
 

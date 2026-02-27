@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle, XCircle, RotateCcw, Trophy, BookOpen, AlertCircle, ChevronDown, ChevronRight, Eye, Brain, TrendingDown, Edit3, Volume2, X } from 'lucide-react';
+import { CheckCircle, XCircle, RotateCcw, Trophy, BookOpen, AlertCircle, ChevronDown, ChevronRight, Eye, Brain, TrendingDown, Edit3, Volume2, X, PlayCircle } from 'lucide-react';
 import { fetchWeakPairs, saveWeakPair, updateCorrectStreak, clearAllWeakPairs } from './lib/weakPairsService';
 import GRE_CLUSTERS, { GRE_WORDS } from './lib/greClusters';
 import clusterHelpers from './lib/clusterHelpers';
@@ -10,6 +10,7 @@ const CLUSTER_TREE = GRE_CLUSTERS;
 // Synonym groups for the practice quiz
 const SYNONYM_GROUPS = CLUSTER_TREE.flatMap(cluster =>
     cluster.subClusters.map(sub => ({
+        clusterId: cluster.id,
         words: sub.words,
         meaning: sub.name
     }))
@@ -136,7 +137,7 @@ const CLUSTER_THEMES = [
 ];
 
 // ---------- WordFlipCard Component ----------
-const WordFlipCard = ({ word, meaning, theme, isWeak, isHighlighted, disabled, onClick }) => {
+const WordFlipCard = ({ word, meaning, theme, isWeak, isHighlighted, studyMode, isPrimary, disabled, onClick }) => {
     const handleSpeak = (e) => {
         e.stopPropagation();
         speakWord(word);
@@ -144,9 +145,9 @@ const WordFlipCard = ({ word, meaning, theme, isWeak, isHighlighted, disabled, o
 
     return (
         <div
-            className={`flip-card w-28 h-12 flex items-center justify-center p-1 relative rounded-lg border shadow-sm transition-all ${isHighlighted && !disabled ? 'search-highlight-trigger' : ''
-                } ${disabled ? 'opacity-40 grayscale-0 pointer-events-none' : 'hover:scale-105'} ${isWeak ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100'
-                }`}
+            className={`flip-card w-28 h-12 flex items-center justify-center p-1 relative rounded-lg border shadow-sm transition-all group/card ${isHighlighted && !disabled ? 'search-highlight-trigger' : ''
+                } ${disabled ? 'opacity-40 grayscale-0 pointer-events-none' : 'hover:scale-105 active:scale-95'} ${isWeak ? 'bg-red-50 border-red-300 shadow-red-100' : 'bg-white border-gray-100'
+                } ${isPrimary ? 'border-l-4 border-l-indigo-500' : ''}`}
             onClick={(e) => {
                 e.stopPropagation();
                 if (!disabled) {
@@ -156,7 +157,8 @@ const WordFlipCard = ({ word, meaning, theme, isWeak, isHighlighted, disabled, o
             }}
         >
             <div className="flex flex-col items-center justify-center w-full px-1">
-                <span className={`text-[13px] font-bold truncate w-full text-center ${isWeak ? 'text-red-700' : 'text-gray-800'}`}>
+                <span className={`text-[13px] font-bold truncate w-center transition-all duration-300 ${isWeak ? 'text-red-700' : 'text-gray-800'
+                    } ${studyMode ? 'blur-[3px] group-hover/card:blur-0 opacity-20 group-hover/card:opacity-100' : ''}`}>
                     {word}
                 </span>
                 <div className="flex items-center gap-1 mt-0.5" onClick={handleSpeak}>
@@ -165,6 +167,7 @@ const WordFlipCard = ({ word, meaning, theme, isWeak, isHighlighted, disabled, o
                 </div>
             </div>
             {isWeak && <span className="weak-badge">!</span>}
+            {isPrimary && !studyMode && <span className="absolute -top-1 -left-1 bg-indigo-500 text-white text-[6px] font-black px-1 rounded-sm uppercase tracking-tighter shadow-md">Anchor</span>}
         </div>
     );
 };
@@ -231,10 +234,35 @@ const WordPopover = ({ word, wordInfo, theme, onClose, onQuiz }) => {
     );
 };
 
+// ---------- Semantic Icons Map ----------
+const GROUP_ICONS = {
+    1: '✨', 2: '🚫', 3: '🌿', 4: '👑', 5: '🧱', 6: '🎭', 7: '⌛', 8: '🔥', 9: '🧩', 10: '⚔️',
+    11: '🗣️', 12: '🦥', 13: '🔬', 14: '🎯', 15: '🛡️', 16: '🌊', 17: '💢', 18: '🔍', 19: '🗑️', 20: '🎗️',
+    21: '📜', 22: '🕵️', 23: '👶', 24: '💰', 25: '🦁', 26: '⚖️', 27: '🎉', 28: '🌧️', 29: '🤬', 30: '⚖️',
+    31: '🎋', 32: '🎨', 33: '👯', 34: '🥱', 35: '☢️', 36: '🍎', 37: '🧘', 38: '📢', 39: '🤫', 40: '🏃',
+    default: '📚'
+};
+
 // Component for Visual Cluster Tree
-const ClusterTreeView = ({ weakWords = new Set(), searchQuery = '' }) => {
+const ClusterTreeView = ({ weakWords = new Set(), weakPairs = [], searchQuery = '', onStartQuiz }) => {
     const [expandedClusters, setExpandedClusters] = useState(new Set([1, 2, 3]));
     const [selectedWord, setSelectedWord] = useState(null);
+    const [studyMode, setStudyMode] = useState(false);
+
+    // Calculate progression for a group
+    const getGroupMastery = (cluster) => {
+        const allWords = cluster.subClusters.flatMap(sc => sc.words).map(w => w.toLowerCase());
+        const groupWeak = allWords.filter(w => weakWords.has(w));
+
+        // Find mastery (correct streak >= 3 from weakPairs if it exists there)
+        // This is a bit complex since weakPairs only has words that WERE weak
+        // Let's just use weak status for now for the progress bar
+        return {
+            total: allWords.length,
+            weak: groupWeak.length,
+            mastered: 0 // Placeholder until we have full word history
+        };
+    };
 
     const toggleCluster = (clusterId) => {
         const newExpanded = new Set(expandedClusters);
@@ -316,7 +344,17 @@ const ClusterTreeView = ({ weakWords = new Set(), searchQuery = '' }) => {
                     </h2>
                     <p className="text-gray-400 text-xs md:text-sm mt-0.5 italic">Visual concept clusters for easier memorization</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setStudyMode(!studyMode)}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${studyMode
+                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-md'
+                            : 'bg-white border-gray-200 text-gray-600 hover:border-indigo-300'}`}
+                    >
+                        <Eye size={14} className={studyMode ? 'text-white' : 'text-indigo-500'} />
+                        {studyMode ? 'Ghost Mode: ON' : 'Active Recall (HIDDEN)'}
+                    </button>
+                    <div className="h-6 w-[1px] bg-gray-100 mx-1 hidden md:block"></div>
                     <button
                         onClick={expandAll}
                         className="text-slate-500 hover:text-slate-800 font-bold px-3 py-1.5 rounded-lg text-xs transition-colors border border-transparent hover:border-slate-100"
@@ -325,9 +363,9 @@ const ClusterTreeView = ({ weakWords = new Set(), searchQuery = '' }) => {
                     </button>
                     <button
                         onClick={collapseAll}
-                        className="text-slate-400 hover:text-slate-600 font-bold px-3 py-1.5 rounded-lg text-xs transition-colors"
+                        className="text-slate-500 hover:text-slate-800 font-bold px-3 py-1.5 rounded-lg text-xs transition-colors border border-transparent hover:border-slate-100"
                     >
-                        Collapse All
+                        Compress All
                     </button>
                 </div>
             </div>
@@ -337,32 +375,64 @@ const ClusterTreeView = ({ weakWords = new Set(), searchQuery = '' }) => {
                     const isExpanded = expandedClusters.has(cluster.id);
                     const hasWeak = clusterHasWeakWords(cluster);
                     const theme = CLUSTER_THEMES[cluster.id % CLUSTER_THEMES.length];
+                    const mastery = getGroupMastery(cluster);
+                    const groupIcon = GROUP_ICONS[cluster.id] || GROUP_ICONS.default;
 
                     return (
                         <div key={cluster.id} className={`rounded-xl border transition-all ${isExpanded ? 'border-gray-100 bg-slate-50/30' : 'border-transparent'}`}>
                             {/* Cluster Header - minimalist accent */}
-                            <button
-                                onClick={() => toggleCluster(cluster.id)}
-                                className={`w-full p-4 rounded-xl flex items-center justify-between transition-all bg-white border ${isExpanded ? 'border-gray-100 shadow-sm' : 'border-gray-50 hover:border-gray-100'
-                                    } ${hasWeak ? 'border-red-100' : ''}`}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}>
-                                        <ChevronRight size={16} className="text-gray-300" />
+                            <div className={`group flex items-center bg-white rounded-xl border transition-all ${isExpanded ? 'border-gray-100 shadow-sm' : 'border-gray-50 hover:border-gray-100'
+                                } ${hasWeak ? 'border-red-100' : ''}`}>
+                                <button
+                                    onClick={() => toggleCluster(cluster.id)}
+                                    className="flex-1 p-4 flex items-center justify-between"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}>
+                                            <ChevronRight size={16} className="text-gray-300" />
+                                        </div>
+                                        <div className="text-2xl mr-1">{groupIcon}</div>
+                                        <div className="text-left">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-bold text-gray-700">Group {cluster.id}: {cluster.name}</span>
+                                                {hasWeak && (
+                                                    <span className="text-[9px] font-bold text-red-500 uppercase tracking-tighter bg-red-50 px-1.5 py-0.5 rounded">
+                                                        Review
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {/* Progress Bar */}
+                                            <div className="flex items-center gap-1 mt-1.5 w-32 h-1 bg-gray-100 rounded-full overflow-hidden">
+                                                <div
+                                                    className="h-full bg-red-400"
+                                                    style={{ width: `${(mastery.weak / mastery.total) * 100}%` }}
+                                                />
+                                                <div
+                                                    className="h-full bg-indigo-500"
+                                                    style={{ width: `${(mastery.mastered / mastery.total) * 100}%` }}
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="text-left">
-                                        <span className="font-bold text-gray-700">{cluster.name}</span>
-                                        {hasWeak && (
-                                            <span className="ml-2 text-[9px] font-bold text-red-500 uppercase tracking-tighter bg-red-50 px-1.5 py-0.5 rounded">
-                                                Review
-                                            </span>
-                                        )}
-                                    </div>
+                                    <span className="text-[10px] font-bold text-gray-300 uppercase tracking-tight hidden sm:block">
+                                        {cluster.subClusters.length} sections
+                                    </span>
+                                </button>
+
+                                {/* Quiz Button */}
+                                <div className="pr-4 py-4">
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onStartQuiz(cluster.id);
+                                        }}
+                                        className="p-2 hover:bg-indigo-50 text-indigo-400 hover:text-indigo-600 rounded-lg transition-colors group/quiz"
+                                        title="Practice this group"
+                                    >
+                                        <PlayCircle size={20} className="group-hover/quiz:scale-110 transition-transform" />
+                                    </button>
                                 </div>
-                                <span className="text-[10px] font-bold text-gray-300 uppercase tracking-tight">
-                                    {cluster.subClusters.length} groups
-                                </span>
-                            </button>
+                            </div>
 
                             {/* Sub-clusters */}
                             {isExpanded && (
@@ -379,6 +449,7 @@ const ClusterTreeView = ({ weakWords = new Set(), searchQuery = '' }) => {
                                                     {ordered.map((word, wordIdx) => {
                                                         const isWordWeak = weakWords.has(word.toLowerCase());
                                                         const isWordHighlighted = searchQuery && word.toLowerCase().includes(searchQuery.toLowerCase());
+                                                        const isPrimary = wordIdx === 0;
 
                                                         return (
                                                             <WordFlipCard
@@ -388,6 +459,8 @@ const ClusterTreeView = ({ weakWords = new Set(), searchQuery = '' }) => {
                                                                 theme={theme}
                                                                 isWeak={isWordWeak}
                                                                 isHighlighted={isWordHighlighted}
+                                                                studyMode={studyMode}
+                                                                isPrimary={isPrimary}
                                                                 disabled={!!selectedWord}
                                                                 onClick={() => setSelectedWord(word)}
                                                             />
@@ -807,6 +880,8 @@ const VocabStudyApp = ({ user }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResult, setSearchResult] = useState(null);
 
+    const [groupFilter, setGroupFilter] = useState(null);
+
     // Load weak pairs from Supabase on mount or when user changes
     useEffect(() => {
         if (user?.id) {
@@ -824,13 +899,15 @@ const VocabStudyApp = ({ user }) => {
         }
     }, [currentView]);
 
-    const generateQuestion = () => {
+    const generateQuestion = (filterId = null) => {
         setSelectedWords([]);
         setShowFeedback(false);
         setPairResults([]);
 
-        const isLockdown = weakPairs.length >= 30;
-        const numPairs = Math.floor(Math.random() * 3) + 1;
+        const activeFilter = filterId !== null ? filterId : groupFilter;
+
+        const isLockdown = weakPairs.length >= 30 && activeFilter === null;
+        const numPairs = activeFilter !== null ? 2 : Math.floor(Math.random() * 3) + 1;
         const questionWords = [];
         const correctPairs = [];
 
@@ -847,17 +924,45 @@ const VocabStudyApp = ({ user }) => {
                 });
             });
         } else {
-            // NORMAL MODE: Pick random groups from SYNONYM_GROUPS
+            // NORMAL MODE: Prioritize weak words if they exist (70% chance to include at least one weak pair)
+            const shouldIncludeWeak = weakPairs.length > 0 && Math.random() < 0.7 && activeFilter === null;
+            let weakToInclude = [];
+
+            if (shouldIncludeWeak) {
+                const shuffledWeak = [...weakPairs].sort(() => Math.random() - 0.5);
+                weakToInclude = shuffledWeak.slice(0, Math.min(numPairs, 1)); // Include at least one
+
+                weakToInclude.forEach(pair => {
+                    questionWords.push(pair.word1, pair.word2);
+                    correctPairs.push({
+                        words: [pair.word1, pair.word2],
+                        meaning: pair.word1Info?.meaning || pair.word2Info?.meaning || 'Weak Word Review'
+                    });
+                });
+            }
+
+            const activePool = activeFilter !== null
+                ? SYNONYM_GROUPS.filter(g => g.clusterId === activeFilter)
+                : SYNONYM_GROUPS;
+
+            const pool = activePool.length >= 1 ? activePool : SYNONYM_GROUPS;
             const selectedGroups = [];
             const usedGroups = new Set();
+            const targetCount = Math.min(numPairs - correctPairs.length, pool.length);
 
-            while (selectedGroups.length < numPairs) {
-                const randomIndex = Math.floor(Math.random() * SYNONYM_GROUPS.length);
+            while (selectedGroups.length < targetCount) {
+                const randomIndex = Math.floor(Math.random() * pool.length);
                 if (!usedGroups.has(randomIndex)) {
-                    const group = SYNONYM_GROUPS[randomIndex];
-                    if (group.words.length >= 2) {
+                    const group = pool[randomIndex];
+                    // Avoid picking a group that contains words already in questionWords (from weak pairs)
+                    const hasConflict = group.words.some(w => questionWords.includes(w));
+                    if (!hasConflict) {
                         selectedGroups.push(group);
                         usedGroups.add(randomIndex);
+                    } else {
+                        // If we searched too many times and can't find a conflict-free group, just break
+                        if (usedGroups.size > pool.length / 2) break;
+                        usedGroups.add(randomIndex); // skip this one
                     }
                 }
             }
@@ -1057,6 +1162,25 @@ const VocabStudyApp = ({ user }) => {
                     </div>
                 )}
 
+                {/* Group Filter Banner */}
+                {groupFilter && currentView === 'practice' && (
+                    <div className={`bg-indigo-600 text-white p-3 flex items-center justify-between px-6 font-bold text-sm ${isLockdown ? 'border-t border-indigo-400' : 'rounded-t-lg'}`}>
+                        <div className="flex items-center gap-2">
+                            <PlayCircle size={18} />
+                            PRACTICING: {CLUSTER_TREE.find(c => c.id === groupFilter)?.name || `Group ${groupFilter}`}
+                        </div>
+                        <button
+                            onClick={() => {
+                                setGroupFilter(null);
+                                generateQuestion(null);
+                            }}
+                            className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-lg transition-colors flex items-center gap-1"
+                        >
+                            <X size={14} /> Clear Filter
+                        </button>
+                    </div>
+                )}
+
                 {/* Main Header */}
                 <div className={`bg-white rounded-lg shadow-lg p-4 md:p-6 mb-4 md:mb-6 ${isLockdown && currentView === 'practice' ? 'rounded-t-none border-t-0' : ''}`}>
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
@@ -1171,11 +1295,17 @@ const VocabStudyApp = ({ user }) => {
                 )}
                 {currentView === 'tree' && <ClusterTreeView
                     searchQuery={searchQuery}
+                    weakPairs={weakPairs}
                     weakWords={(() => {
                         const s = new Set();
                         weakPairs.forEach(p => { s.add(p.word1.toLowerCase()); s.add(p.word2.toLowerCase()); });
                         return s;
                     })()}
+                    onStartQuiz={(groupId) => {
+                        setGroupFilter(groupId);
+                        setCurrentView('practice');
+                        generateQuestion(groupId);
+                    }}
                 />}
                 {currentView === 'recall' && <RecallQuiz />}
 

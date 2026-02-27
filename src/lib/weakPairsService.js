@@ -59,6 +59,26 @@ export const saveWeakPair = async (userId, word1, word2, word1Info, word2Info, r
             .eq('id', existing.id);
         if (error) console.error('Error updating weak pair:', error);
     } else {
+        // Enforce 30-pair limit: Fetch current count
+        const { data: countData, error: countError } = await supabase
+            .from('weak_pairs')
+            .select('id, last_seen')
+            .eq('user_id', userId)
+            .order('last_seen', { ascending: true });
+
+        if (countError) {
+            console.error('Error checking weak pairs count:', countError);
+        } else if (countData && countData.length >= 30) {
+            // Remove the oldest pair(s) to maintain the limit of 30
+            const toRemove = countData.length - 29; // usually 1
+            const idsToRemove = countData.slice(0, toRemove).map(row => row.id);
+
+            await supabase
+                .from('weak_pairs')
+                .delete()
+                .in('id', idsToRemove);
+        }
+
         // Insert new
         const { error } = await supabase
             .from('weak_pairs')

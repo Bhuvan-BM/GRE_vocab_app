@@ -14,19 +14,50 @@ const Auth = ({ user, onAuthChange }) => {
         setLoading(true);
         setError('');
 
+        // Basic validation
+        if (!email.includes('@')) {
+            setError('Please enter a valid email address.');
+            setLoading(false);
+            return;
+        }
+        if (password.length < 6) {
+            setError('Password must be at least 6 characters.');
+            setLoading(false);
+            return;
+        }
+
         try {
             if (isSignup) {
-                const { error } = await supabase.auth.signUp({ email, password });
+                const { data, error } = await supabase.auth.signUp({
+                    email,
+                    password,
+                    options: {
+                        emailRedirectTo: window.location.origin
+                    }
+                });
                 if (error) throw error;
-                setError('Signup successful! Check your email to verify.');
+
+                if (data?.user && data?.session) {
+                    // Directly logged in (auto-confirm enabled)
+                    onAuthChange(data.user);
+                } else {
+                    setError('Signup successful! Please check your email for a verification link.');
+                }
             } else {
-                const { error } = await supabase.auth.signInWithPassword({ email, password });
+                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) throw error;
+                if (data?.user) onAuthChange(data.user);
             }
             setEmail('');
             setPassword('');
         } catch (err) {
-            setError(err.message || 'Auth error');
+            let msg = err.message || 'Authentication error';
+            if (msg.toLowerCase().includes('rate limit')) {
+                msg = 'Too many attempts. Please wait a few minutes before trying again or use a different email.';
+            } else if (msg.toLowerCase().includes('invalid login credentials')) {
+                msg = 'Invalid email or password. Please try again.';
+            }
+            setError(msg);
         } finally {
             setLoading(false);
         }
@@ -39,16 +70,19 @@ const Auth = ({ user, onAuthChange }) => {
 
     if (user) {
         return (
-            <div className="bg-white border-b border-gray-200 p-4">
+            <div className="bg-white border-b border-gray-100 p-4 sticky top-0 z-50 shadow-sm">
                 <div className="max-w-6xl mx-auto flex justify-between items-center">
-                    <div className="text-sm">
-                        Logged in as: <span className="font-semibold text-indigo-600">{user.email}</span>
+                    <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                        <div className="text-xs md:text-sm text-gray-500">
+                            Logged in: <span className="font-bold text-gray-800">{user.email}</span>
+                        </div>
                     </div>
                     <button
                         onClick={handleLogout}
-                        className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm flex items-center gap-2"
+                        className="text-gray-400 hover:text-red-500 px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors border border-gray-100 hover:border-red-100"
                     >
-                        <LogOut size={16} />
+                        <LogOut size={14} />
                         Logout
                     </button>
                 </div>
@@ -57,50 +91,71 @@ const Auth = ({ user, onAuthChange }) => {
     }
 
     return (
-        <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border-b border-indigo-200 p-4">
-            <div className="max-w-6xl mx-auto">
-                <h2 className="text-lg font-bold mb-4 text-gray-800">
-                    {isSignup ? 'Create Account' : 'Login to Save Your Progress'}
-                </h2>
-                <form onSubmit={handleAuth} className="flex gap-3 items-end">
+        <div className="bg-white border-b border-gray-100 p-6 md:p-8">
+            <div className="max-w-md mx-auto">
+                <div className="text-center mb-6">
+                    <h2 className="text-2xl font-black text-gray-800 tracking-tight mb-2">
+                        {isSignup ? 'Create Account' : 'Welcome Back'}
+                    </h2>
+                    <p className="text-gray-400 text-sm italic">
+                        {isSignup ? 'Join the GRE Vocab Master community' : 'Login to save your progress and weak words'}
+                    </p>
+                </div>
+
+                <form onSubmit={handleAuth} className="space-y-4">
                     <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Email</label>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Email Address</label>
                         <input
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             placeholder="your@email.com"
-                            className="border rounded px-3 py-2 text-sm"
+                            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all"
                             required
                         />
                     </div>
                     <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Password</label>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Password</label>
                         <input
                             type="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             placeholder="••••••••"
-                            className="border rounded px-3 py-2 text-sm"
+                            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all"
                             required
                         />
                     </div>
+
                     <button
                         type="submit"
                         disabled={loading}
-                        className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm font-semibold"
+                        className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white py-3.5 rounded-xl text-sm font-black shadow-lg shadow-indigo-100 transition-all active:scale-[0.98]"
                     >
-                        {loading ? 'Loading...' : isSignup ? 'Sign Up' : 'Login'}
+                        {loading ? 'Processing...' : isSignup ? 'Create Master Account' : 'Sign In Now'}
                     </button>
-                    <button
-                        type="button"
-                        onClick={() => { setIsSignup(!isSignup); setError(''); }}
-                        className="text-indigo-600 hover:underline text-sm"
-                    >
-                        {isSignup ? 'Login instead' : 'Create account'}
-                    </button>
+
+                    <div className="text-center pt-2">
+                        <button
+                            type="button"
+                            onClick={() => { setIsSignup(!isSignup); setError(''); }}
+                            className="text-indigo-600 hover:text-indigo-800 font-bold text-xs"
+                        >
+                            {isSignup ? 'Already have an account? Login' : 'New here? Create an account'}
+                        </button>
+                    </div>
                 </form>
-                {error && <div className="text-red-600 text-sm mt-2">{error}</div>}
+
+                {error && (
+                    <div className={`mt-4 p-4 rounded-xl text-sm font-medium flex items-start gap-3 animate-slide-in ${error.includes('successful')
+                            ? 'bg-green-50 text-green-700 border border-green-100'
+                            : 'bg-red-50 text-red-600 border border-red-100'
+                        }`}>
+                        <div className="shrink-0 mt-0.5">
+                            {error.includes('successful') ? '✓' : 'ℹ️'}
+                        </div>
+                        <p>{error}</p>
+                    </div>
+                )}
             </div>
         </div>
     );
